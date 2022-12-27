@@ -176,38 +176,30 @@ func makeMainMenu(win *gtk.Window) *Menu {
         box.SetMarginStart(24)
         box.SetMarginEnd(24)
 
-        displayedProjectPath := projectPath
+        if templateName == "" {
+            label, err := gtk.LabelNew("Ошибка: не указано название шаблона")
 
-        if displayedProjectPath == "" {
-            displayedProjectPath = "текущую дерикторию"
-        }
+            if err != nil {
+                log.Panic(err)
+            }
 
-        label, err := gtk.LabelNew(fmt.Sprintf("Копирование файлов\nиз %s\nв %s", templatePath, displayedProjectPath))
+            box.Add(label)
+        } else if !Exists(templatePath) {
+            label, err := gtk.LabelNew(fmt.Sprintf("Ошибка: шаблона %s не существует", templateName))
 
-        if err != nil {
-            log.Panic(err)
-        }
+            if err != nil {
+                log.Panic(err)
+            }
 
-        box.Add(label)
+            box.Add(label)
+        } else {
+            displayedProjectPath := projectPath
 
-        button, err := gtk.ButtonNewWithLabel("Подтвердить")
+            if displayedProjectPath == "" {
+                displayedProjectPath = "текущую дерикторию"
+            }
 
-        if err != nil {
-            log.Panic(err)
-        }
-
-        button.Connect("clicked", func() {
-            box.GetChildren().Foreach(func(child any) {
-                widget, ok := child.(*gtk.Widget)
-
-                if !ok {
-                    return
-                }
-
-                widget.Destroy()
-            })
-
-            label, err := gtk.LabelNew("Копирование...")
+            label, err := gtk.LabelNew(fmt.Sprintf("Копирование файлов\nиз %s\nв %s", templatePath, displayedProjectPath))
 
             if err != nil {
                 log.Panic(err)
@@ -215,18 +207,44 @@ func makeMainMenu(win *gtk.Window) *Menu {
 
             box.Add(label)
 
-            box.ShowAll()
-
-            err = CopyDirectory(templatePath, projectPath)
+            button, err := gtk.ButtonNewWithLabel("Подтвердить")
 
             if err != nil {
-                label.SetLabel("Ошибка:\n" + err.Error())
-            } else {
-                label.SetLabel("Инициализация проекта прошла успешно")
+                log.Panic(err)
             }
-        })
 
-        box.Add(button)
+            button.Connect("clicked", func() {
+                box.GetChildren().Foreach(func(child any) {
+                    widget, ok := child.(*gtk.Widget)
+
+                    if !ok {
+                        return
+                    }
+
+                    widget.Destroy()
+                })
+
+                label, err := gtk.LabelNew("Копирование...")
+
+                if err != nil {
+                    log.Panic(err)
+                }
+
+                box.Add(label)
+
+                box.ShowAll()
+
+                err = CopyDirectory(templatePath, projectPath)
+
+                if err != nil {
+                    label.SetLabel("Ошибка:\n" + err.Error())
+                } else {
+                    label.SetLabel("Инициализация проекта прошла успешно")
+                }
+            })
+
+            box.Add(button)
+        }
 
         confirmWin.Add(box)
 
@@ -252,14 +270,9 @@ func makeMainMenu(win *gtk.Window) *Menu {
 
         templatesRoot = fileChooserDialog.GetFilename()
 
-        f, err := os.Open("config")
+        f, err := os.OpenFile("config", os.O_CREATE | os.O_WRONLY | os.O_TRUNC, 644)
         if err != nil {
-            f2, e := os.Create("config")
-            if e != nil {
-                log.Panic(e)
-            }
-
-            f = f2
+            log.Panic(err)
         }
 
         f.WriteString(templatesRoot)
